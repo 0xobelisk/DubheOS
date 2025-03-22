@@ -1,11 +1,12 @@
 use sc_service::ChainType;
+use sc_service::Properties;
 use solochain_template_runtime::WASM_BINARY;
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec;
 
 fn dubhe_properties() -> Properties {
-	let mut properties = sc_chain_spec::Properties::new();
+	let mut properties = Properties::new();
 
 	properties.insert("tokenSymbol".into(), "DUBHE".into());
 	properties.insert("tokenDecimals".into(), 7.into());
