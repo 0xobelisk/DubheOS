@@ -7,7 +7,7 @@ use crate::service::FullClient;
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
-use solochain_template_runtime as runtime;
+use dubhe_os_runtime as runtime;
 use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_keyring::Sr25519Keyring;
@@ -105,11 +105,11 @@ pub fn create_benchmark_extrinsic(
 	let best_hash = client.chain_info().best_hash;
 	let best_block = client.chain_info().best_number;
 
-	let period = runtime::configs::BlockHashCount::get()
+	let period = runtime::BlockHashCount::get()
 		.checked_next_power_of_two()
 		.map(|c| c / 2)
 		.unwrap_or(2) as u64;
-	let tx_ext: runtime::TxExtension = (
+	let extra: runtime::SignedExtra = (
 		frame_system::CheckNonZeroSender::<runtime::Runtime>::new(),
 		frame_system::CheckSpecVersion::<runtime::Runtime>::new(),
 		frame_system::CheckTxVersion::<runtime::Runtime>::new(),
@@ -121,12 +121,11 @@ pub fn create_benchmark_extrinsic(
 		frame_system::CheckNonce::<runtime::Runtime>::from(nonce),
 		frame_system::CheckWeight::<runtime::Runtime>::new(),
 		pallet_transaction_payment::ChargeTransactionPayment::<runtime::Runtime>::from(0),
-		frame_metadata_hash_extension::CheckMetadataHash::<runtime::Runtime>::new(false),
 	);
 
 	let raw_payload = runtime::SignedPayload::from_raw(
 		call.clone(),
-		tx_ext.clone(),
+		extra.clone(),
 		(
 			(),
 			runtime::VERSION.spec_version,
@@ -136,7 +135,6 @@ pub fn create_benchmark_extrinsic(
 			(),
 			(),
 			(),
-			None,
 		),
 	);
 	let signature = raw_payload.using_encoded(|e| sender.sign(e));
@@ -145,7 +143,7 @@ pub fn create_benchmark_extrinsic(
 		call,
 		sp_runtime::AccountId32::from(sender.public()).into(),
 		runtime::Signature::Sr25519(signature),
-		tx_ext,
+		extra,
 	)
 }
 

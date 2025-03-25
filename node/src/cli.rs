@@ -1,4 +1,5 @@
 use sc_cli::RunCmd;
+use crate::dubhe_os_cli::set_dubhe_os_keystore::SetKeystoreCmd;
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
@@ -43,4 +44,7 @@ pub enum Subcommand {
 
 	/// Db meta columns information.
 	ChainInfo(sc_cli::ChainInfoCmd),
+
+	/// Set the keystore
+	SetKeystore(SetKeystoreCmd),
 }

@@ -7,8 +7,9 @@ use crate::{
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
 use sc_cli::SubstrateCli;
 use sc_service::PartialComponents;
-use solochain_template_runtime::{Block, EXISTENTIAL_DEPOSIT};
+use dubhe_os_runtime::{Block, EXISTENTIAL_DEPOSIT};
 use sp_keyring::Sr25519Keyring;
+
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
@@ -37,8 +38,8 @@ impl SubstrateCli for Cli {
 
 	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		Ok(match id {
-			"dev" => Box::new(chain_spec::development_chain_spec()?),
-			"" | "local" => Box::new(chain_spec::local_chain_spec()?),
+			"dev" => Box::new(chain_spec::development_config()?),
+			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
 			path =>
 				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
 		})
@@ -144,12 +145,11 @@ pub fn run() -> sc_cli::Result<()> {
 						let ext_builder = RemarkBuilder::new(client.clone());
 
 						cmd.run(
-							config.chain_spec.name().into(),
+							config,
 							client,
 							inherent_benchmark_data()?,
 							Vec::new(),
 							&ext_builder,
-							false,
 						)
 					},
 					BenchmarkCmd::Extrinsic(cmd) => {
@@ -175,14 +175,30 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
+		Some(Subcommand::SetKeystore(cmd)) => {
+			let runner = cli.create_runner(cmd)?;
+			runner.sync_run(|_config: sc_service::Configuration| {
+				let content = std::fs::read(&cmd.keystore_path)
+					.map_err(|e| format!("Error reading keystore file: {}", e))?;
+				
+				sp_io::offchain::local_storage_set(
+					sp_core::offchain::StorageKind::PERSISTENT,
+					b"dubhe-os-keystore",
+					&content
+				);
+  
+				println!("Keystore set successfully");
+				Ok(())
+			})
+		},
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
 				match config.network.network_backend {
 					sc_network::config::NetworkBackendType::Libp2p => service::new_full::<
 						sc_network::NetworkWorker<
-							solochain_template_runtime::opaque::Block,
-							<solochain_template_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
+							dubhe_os_runtime::opaque::Block,
+							<dubhe_os_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
 						>,
 					>(config)
 					.map_err(sc_cli::Error::Service),
