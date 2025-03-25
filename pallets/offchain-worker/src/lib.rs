@@ -48,7 +48,7 @@ use frame_support::{
 use frame_system::{
 	self as system,
 	offchain::{
-		AppCrypto, CreateSignedTransaction,
+		AppCrypto, CreateSignedTransaction, 
 		SignedPayload, SigningTypes, SubmitTransaction,
 	},
 	pallet_prelude::BlockNumberFor,
@@ -118,23 +118,24 @@ pub mod crypto {
 
 pub use pallet::*;
 
-/// Struct to deserialize the response from the Sui API
+/// Struct to deserialize the response from the Aptos API
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ResponseData {
     is_succ: bool,
     #[serde(default)]
-    res: Option<SuiData>,
+    res: Option<AptosData>,
     #[serde(default)]
     err: Option<ErrorData>,
 }
 
-/// Struct to hold Sui-specific data
+/// Struct to hold Aptos-specific data
 #[derive(Deserialize, Debug)]
-struct SuiData {
-    sui_digest: String,
+struct AptosData {
+    aptos_digest: String,
     time: String,
 }
+
 
 /// Struct to hold error data
 #[derive(Deserialize, Debug)]
@@ -249,15 +250,15 @@ pub mod pallet {
 		#[pallet::weight({0})]
 		pub fn process_task_unsigned(
 			origin: OriginFor<T>,
-			_block_number: BlockNumberFor<T>,
+			block_number: BlockNumberFor<T>,
 			task_index: u32,
-			sui_digest: Vec<u8>,
+			aptos_digest: Vec<u8>,
 			time: Vec<u8>,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
 
-			let bounded_sui_digest: BoundedVec<u8, T::StringLimit> = 
-				sui_digest.try_into().map_err(|_| Error::<T>::DigestTooLong)?;
+			let bounded_aptos_digest: BoundedVec<u8, T::StringLimit> = 
+				aptos_digest.try_into().map_err(|_| Error::<T>::DigestTooLong)?;
 			let bounded_time: BoundedVec<u8, T::StringLimit> = 
 				time.try_into().map_err(|_| Error::<T>::TimeTooLong)?;
 
@@ -266,13 +267,13 @@ pub mod pallet {
 					task.processed = true;
 					TaskHistory::<T>::insert(
 						task.da_height,
-						(task.blob.clone(), true, Some(bounded_sui_digest.clone()), Some(bounded_time.clone()))
+						(task.blob.clone(), true, Some(bounded_aptos_digest.clone()), Some(bounded_time.clone()))
 					);
 
 					Self::deposit_event(Event::TaskProcessed { 
 						da_height: task.da_height, 
 						blob: task.blob.clone(),
-						sui_digest: Some(bounded_sui_digest),
+						aptos_digest: Some(bounded_aptos_digest),
 						time: Some(bounded_time)
 					});
 				}
@@ -297,7 +298,7 @@ pub mod pallet {
         TaskProcessed{
             da_height: u64, 
             blob: BoundedVec<u8, T::StringLimit>,
-            sui_digest: Option<BoundedVec<u8, T::StringLimit>>,
+            aptos_digest: Option<BoundedVec<u8, T::StringLimit>>,
             time: Option<BoundedVec<u8, T::StringLimit>>
         },
 	}
@@ -325,7 +326,7 @@ pub mod pallet {
 		type Call = Call<T>;
 
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-			if let Call::process_task_unsigned { block_number, task_index, sui_digest: _, time: _ } = call {
+			if let Call::process_task_unsigned { block_number, task_index, aptos_digest: _, time: _ } = call {
 				// Check if it's time to submit a new unsigned transaction
 				let current_block = <system::Pallet<T>>::block_number();
 				let next_unsigned_at = <NextUnsignedAt<T>>::get();
@@ -363,7 +364,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		u64,  // da_height as key
-		(BoundedVec<u8, T::StringLimit>, bool, Option<BoundedVec<u8, T::StringLimit>>, Option<BoundedVec<u8, T::StringLimit>>),  // (blob, processed, sui_digest, time) as value
+		(BoundedVec<u8, T::StringLimit>, bool, Option<BoundedVec<u8, T::StringLimit>>, Option<BoundedVec<u8, T::StringLimit>>),  // (blob, processed, aptos_digest, time) as value
 		ValueQuery
 	>;
 
@@ -392,7 +393,7 @@ impl<T: SigningTypes> SignedPayload<T> for PricePayload<T::Public, BlockNumberFo
 }
 
 impl<T: Config> Pallet<T> {
-    /// Process a task by fetching Sui data and submitting an unsigned transaction.
+    /// Process a task by fetching Aptos data and submitting an unsigned transaction.
     fn process_task(
 		block_number: BlockNumberFor<T>,
 		task_index: u32, 
@@ -400,15 +401,15 @@ impl<T: Config> Pallet<T> {
 	) -> Result<(), &'static str> {
         log::info!("Processing task: {:?}", task.blob.clone());
         
-        match Self::fetch_sui_data(task.da_height, task.blob.clone()) {
-            Ok((sui_digest, time)) => {
-                log::info!("Sui digest: {:?}, Time: {:?}", sui_digest, time);
+        match Self::fetch_aptos_data(task.da_height, task.blob.clone()) {
+            Ok((aptos_digest, time)) => {
+                log::info!("Aptos digest: {:?}, Time: {:?}", aptos_digest, time);
                 
-                // Submit unsigned transaction with sui_digest and time
+                // Submit unsigned transaction with aptos_digest and time
                 let call = Call::process_task_unsigned { 
                     block_number, 
                     task_index,
-                    sui_digest: sui_digest.into_bytes(),
+                    aptos_digest: aptos_digest.into_bytes(),
                     time: time.into_bytes(),
                 };
 
@@ -418,8 +419,8 @@ impl<T: Config> Pallet<T> {
                 Ok(())
             },
             Err(e) => {
-                log::error!("Error getting Sui data: {:?}", e);
-                Err("Failed to get Sui data")
+                log::error!("Error getting Aptos data: {:?}", e);
+                Err("Failed to get Aptos data")
             }
         }
     }
@@ -439,30 +440,33 @@ impl<T: Config> Pallet<T> {
         if let Some(height) = da_height {
             // Update processing status in task history
             TaskHistory::<T>::mutate(height, |task| {
-                let (blob, _, sui_digest, time) = task;
-                *task = (blob.clone(), true, sui_digest.clone(), time.clone());
+                let (blob, _, aptos_digest, time) = task;
+                *task = (blob.clone(), true, aptos_digest.clone(), time.clone());
             });
         }
     }
-	/// Test the Sui API by sending a request with task data.
-	fn fetch_sui_data(da_height: u64, blob: BoundedVec<u8, T::StringLimit>) -> Result<(String, String), http::Error> {
-		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
-		let url = "http://47.236.78.251:3000/v1/Warlus/Store";
+	/// Test the Aptos API by sending a request with task data.
+	fn fetch_aptos_data(da_height: u64, blob: BoundedVec<u8, T::StringLimit>) -> Result<(String, String), http::Error> {
+		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(8_000));
+		let url = "https://aptos-rest.obelisk.build/v1/Aptos/DaManager";
 		
-		let blob_str = sp_std::str::from_utf8(&blob).map_err(|_| {
-			log::error!("Unable to convert blob to string");
+		let blob_str = sp_std::str::from_utf8(&blob).map_err(|e| {
+			log::error!("Unable to convert blob to string: {:?}", e);
 			http::Error::Unknown
 		})?;
 		
 		let request_body = format!(
-			r#"{{"da_height": "{}", "blob": "{}", "epochs": 1}}"#,
+			r#"{{ "da_height": "{}", "blob": "{}" }}"#,
 			da_height, blob_str
 		);
 		
 		log::info!("Preparing to send request to {}", url);
 		log::info!("Request body: {}", request_body);
+		
 		let request = http::Request::post(url, vec![request_body])
 			.add_header("Content-Type", "application/json");
+		
+		log::info!("Sending request...");
 		
 		let pending = request
 			.deadline(deadline)
@@ -472,30 +476,30 @@ impl<T: Config> Pallet<T> {
 				http::Error::IoError
 			})?;
 		
-		log::info!("Request sent, waiting for response");
-		let response = pending.try_wait(deadline).map_err(|_| http::Error::DeadlineReached)??;
-		log::info!("Response received, status code: {}", response.code);
+		log::info!("Request sent, waiting for response...");
 		
-		if response.code != 200 {
-			log::error!("Unexpected status code: {}", response.code);
-			return Err(http::Error::Unknown);
-		}
-	
+		let response = pending.try_wait(deadline).map_err(|e| {
+			log::error!("Failed to get response: {:?}", e);
+			http::Error::DeadlineReached
+		})??;
+		
+		log::info!("Response received, status code: {}", response.code);
+
 		let body = response.body().collect::<Vec<u8>>();
-		let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
-			log::error!("Response body is not valid UTF-8");
+		let body_str = sp_std::str::from_utf8(&body).map_err(|e| {
+			log::error!("Response body is not valid UTF-8: {:?}", e);
 			http::Error::Unknown
 		})?;
-	
+
 		log::info!("Received response body: {}", body_str);
-	
-		let response_json: ResponseData = serde_json::from_str(body_str).map_err(|err| {
-			log::error!("Failed to parse JSON response: {}", err);
+
+		let response_json: ResponseData = serde_json::from_str(body_str).map_err(|e| {
+			log::error!("Failed to parse JSON response: {:?}", e);
 			http::Error::Unknown
 		})?;
-	
-		log::info!("Parsed JSON: {:?}", response_json);
-	
+
+		log::info!("Parsed JSON response: {:?}", response_json);
+
 		if !response_json.is_succ {
 			if let Some(err) = response_json.err {
 				log::error!("Error from server: {:?}", err);
@@ -503,13 +507,11 @@ impl<T: Config> Pallet<T> {
 			return Err(http::Error::Unknown);
 		}
 
-		let sui_data = response_json.res.ok_or_else(|| {
+		let aptos_data = response_json.res.ok_or_else(|| {
 			log::error!("Missing 'res' field in successful response");
 			http::Error::Unknown
 		})?;
 
-		log::info!("Sui digest: {}, Time: {}", sui_data.sui_digest, sui_data.time);
-
-		Ok((sui_data.sui_digest, sui_data.time))
+		Ok((aptos_data.aptos_digest, aptos_data.time))
 	}
 }
