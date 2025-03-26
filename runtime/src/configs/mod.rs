@@ -157,8 +157,9 @@ impl pallet_sudo::Config for Runtime {
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
-/// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime {
+/// Configure the dubhe-bridge in pallets/template.
+impl dubhe_bridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_template::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = dubhe_bridge::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
 }

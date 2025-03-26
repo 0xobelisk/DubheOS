@@ -34,13 +34,21 @@
 //! - A **set of dispatchable functions** that define the pallet's functionality (denoted by the
 //!   `#[pallet::call]` attribute). See: [`dispatchables`].
 //!
-//! Run `cargo doc --package pallet-template --open` to view this pallet's documentation.
+//! Run `cargo doc --package dubhe-bridge --open` to view this pallet's documentation.
 
 // We make sure this pallet uses `no_std` for compiling to Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::{Decode, Encode, MaxEncodedLen};
+use frame_support::pallet_prelude::TypeInfo;
+use frame_support::traits::Currency;
+use sp_core::H256;
+use sp_runtime::RuntimeDebug;
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
+
+pub type BalanceOf<T> =
+<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 // FRAME pallets require their own "mock runtimes" to be able to run unit tests. This module
 // contains a mock runtime specific for testing this pallet's functionality.
@@ -60,6 +68,12 @@ mod benchmarking;
 pub mod weights;
 pub use weights::*;
 
+#[derive(Encode, Decode, Copy, Clone, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub enum Chain {
+	Sui(H256),
+	Aptos(H256)
+}
+
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
 pub mod pallet {
@@ -67,6 +81,7 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use frame_support::traits::fungibles;
 
 	// The `Pallet` struct serves as a placeholder to implement traits, methods and dispatchables
 	// (`Call`s) in this pallet.
@@ -84,6 +99,8 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// A type representing the weights required by the dispatchables of this pallet.
 		type WeightInfo: WeightInfo;
+		/// Fungible asset implementation
+		type Currency: Currency<Self::AccountId>;
 	}
 
 	/// A storage item for this pallet.
@@ -107,11 +124,13 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A user has successfully set a new value.
-		SomethingStored {
+		Deposit {
 			/// The new value set.
-			something: u32,
+			from: Chain,
 			/// The account who set the new value.
-			who: T::AccountId,
+			to: T::AccountId,
+			/// The amount of the deposit.
+			amount: BalanceOf<T>,
 		},
 	}
 
@@ -152,15 +171,9 @@ pub mod pallet {
 		/// error if it isn't. Learn more about origins here: <https://docs.substrate.io/build/origins/>
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::do_something())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
+		pub fn withdraw(origin: OriginFor<T>, something: u32) -> DispatchResult {
 			// Check that the extrinsic was signed and get the signer.
 			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			Something::<T>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
 
 			// Return a successful `DispatchResult`
 			Ok(())
@@ -181,22 +194,12 @@ pub mod pallet {
 		///   ([`Error::StorageOverflow`])
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::cause_error())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
+		pub fn deposit(origin: OriginFor<T>, from: Chain, to: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
 			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match Something::<T>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage. This will cause an error in the event
-					// of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					Something::<T>::put(new);
-					Ok(())
-				},
-			}
+			let imbalance = T::Currency::issue(amount);
+			T::Currency::resolve_creating(&to, imbalance);
+			Self::deposit_event(Event::Deposit { from, to, amount });
+			Ok(())
 		}
 	}
 }
