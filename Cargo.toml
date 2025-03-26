@@ -9,6 +9,7 @@ edition = "2021"
 members = [
     "node",
     "pallets/bridge",
+    "pallets/offchain-worker",
     "runtime",
 ]
 resolver = "2"
@@ -16,6 +17,7 @@ resolver = "2"
 [workspace.dependencies]
 solochain-template-runtime = { path = "./runtime", default-features = false }
 dubhe-bridge = { path = "pallets/bridge", default-features = false }
+dubhe-offchain-worker = { path = "pallets/offchain-worker", default-features = false }
 clap = { version = "4.5.13" }
 frame-benchmarking-cli = { version = "46.0.0", default-features = false }
 frame-metadata-hash-extension = { version = "0.7.0", default-features = false }
@@ -71,4 +73,7 @@ sp-session = { version = "37.0.0", default-features = false }
 sp-storage = { version = "22.0.0", default-features = false }
 sp-transaction-pool = { version = "35.0.0", default-features = false }
 sp-version = { version = "38.0.0", default-features = false }
+sp-std = { version = "14.0.0", default-features = false }
 substrate-wasm-builder = { version = "25.0.0", default-features = false }
+lite-json = { version = "0.2.0", default-features = false }
+log = { version = "0.4.22", default-features = false }

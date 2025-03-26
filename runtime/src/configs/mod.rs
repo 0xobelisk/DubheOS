@@ -39,11 +39,7 @@ use sp_runtime::{traits::One, Perbill};
 use sp_version::RuntimeVersion;
 
 // Local module imports
-use super::{
-	AccountId, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime,
-	RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
-	System, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
-};
+use super::{AccountId, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION};
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -163,3 +159,31 @@ impl dubhe_bridge::Config for Runtime {
 	type WeightInfo = dubhe_bridge::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 }
+
+impl<LocalCall> frame_system::offchain::CreateInherent<LocalCall> for Runtime
+where
+	RuntimeCall: From<LocalCall>,
+{
+	fn create_inherent(call: RuntimeCall) -> UncheckedExtrinsic {
+		UncheckedExtrinsic::new_bare(call)
+	}
+}
+
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Runtime
+where
+	RuntimeCall: From<LocalCall>,
+{
+	type Extrinsic = UncheckedExtrinsic;
+	type RuntimeCall = RuntimeCall;
+}
+
+impl dubhe_offchain_worker::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	// type AuthorityId = dubhe_offchain_worker::crypto::TestAuthId;
+	type GracePeriod = ConstU32<5>;
+	type UnsignedInterval = ConstU32<2>;
+	type UnsignedPriority = ConstU64<{ 1 >> 20}>;
+	type StringLimit = ConstU32<1024>;
+	type MaxTasks = ConstU32<64>;
+}
+

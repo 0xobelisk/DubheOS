@@ -226,4 +226,8 @@ mod runtime {
     // Include the custom logic from the dubhe-bridge in the runtime.
     #[runtime::pallet_index(7)]
     pub type Bridge = dubhe_bridge;
+
+    // Include the custom logic from the dubhe-bridge in the runtime.
+    #[runtime::pallet_index(8)]
+    pub type OffchainWorker = dubhe_offchain_worker;
 }
