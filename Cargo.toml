@@ -15,7 +15,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-solochain-template-runtime = { path = "./runtime", default-features = false }
+dubhe-runtime = { path = "./runtime", default-features = false }
 dubhe-bridge = { path = "pallets/bridge", default-features = false }
 dubhe-offchain-worker = { path = "pallets/offchain-worker", default-features = false }
 clap = { version = "4.5.13" }
