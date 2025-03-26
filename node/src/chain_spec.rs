@@ -8,6 +8,7 @@ pub type ChainSpec = sc_service::GenericChainSpec;
 fn dubhe_properties() -> Properties {
 	let mut properties = Properties::new();
 
+	properties.insert("ss58Format".into(), 0.into());
 	properties.insert("tokenSymbol".into(), "DUBHE".into());
 	properties.insert("tokenDecimals".into(), 7.into());
 
