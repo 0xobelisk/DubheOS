@@ -61,5 +61,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/release/solochain-template-node
+            target/release/dubhe-node
             target/release/wbuild/dubhe-runtime/dubhe_runtime.compact.compressed.wasm
