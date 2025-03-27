@@ -26,6 +26,7 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use sp_runtime::BuildStorage;
 
 pub mod genesis_config_presets;
+mod governance;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -90,6 +91,7 @@ mod block_times {
     pub const SLOT_DURATION: u64 = MILLI_SECS_PER_BLOCK;
 }
 pub use block_times::*;
+use crate::governance::pallet_custom_origins;
 
 // Time is measured by number of blocks.
 pub const MINUTES: BlockNumber = 60_000 / (MILLI_SECS_PER_BLOCK as BlockNumber);
@@ -99,9 +101,19 @@ pub const DAYS: BlockNumber = HOURS * 24;
 pub const BLOCK_HASH_COUNT: BlockNumber = 2400;
 
 // Unit = 10^7，表示一个完整单位包含7位小数
-pub const UNIT: Balance = 10_000_000; // 1 完整单位 = 10^7
-pub const MILLI_UNIT: Balance = 10_000; // 1 毫单位 = 10^4 (UNIT/1000)
-pub const MICRO_UNIT: Balance = 10; // 1 微单位 = 10 (UNIT/1000000)
+pub const UNIT: Balance = 10_000_000;
+pub const CENT: Balance = UNIT / 100;
+pub const GRAND: Balance = 1000 * 10_000_000;
+pub const MILLI_UNIT: Balance = 10_000;
+pub const MICRO_UNIT: Balance = 10;
+pub const SUPPLY_FACTOR: Balance = 100;
+pub const TRANSACTION_BYTE_FEE: Balance = 1 * MILLI_UNIT * SUPPLY_FACTOR;
+pub const STORAGE_BYTE_FEE: Balance = 100 * MILLI_UNIT * SUPPLY_FACTOR;
+pub const WEIGHT_FEE: Balance = 50 * MICRO_UNIT * SUPPLY_FACTOR / 4;
+
+pub const fn deposit(items: u32, bytes: u32) -> Balance {
+    items as Balance * 100 * MILLI_UNIT * SUPPLY_FACTOR + (bytes as Balance) * STORAGE_BYTE_FEE
+}
 
 /// Existential deposit.
 pub const EXISTENTIAL_DEPOSIT: Balance = MICRO_UNIT;
@@ -230,4 +242,23 @@ mod runtime {
     // Include the custom logic from the dubhe-bridge in the runtime.
     #[runtime::pallet_index(8)]
     pub type OffchainWorker = dubhe_offchain_worker;
+
+    #[runtime::pallet_index(70)]
+    pub type Preimage = pallet_preimage;
+    #[runtime::pallet_index(71)]
+    pub type ChildBounties = pallet_child_bounties;
+    #[runtime::pallet_index(72)]
+    pub type Bounties = pallet_bounties;
+    #[runtime::pallet_index(73)]
+    pub type Treasury = pallet_treasury;
+    #[runtime::pallet_index(74)]
+    pub type ConvictionVoting = pallet_conviction_voting;
+    #[runtime::pallet_index(75)]
+    pub type Whitelist = pallet_whitelist;
+    #[runtime::pallet_index(76)]
+    pub type Referenda = pallet_referenda;
+    #[runtime::pallet_index(77)]
+    pub type Origins = pallet_custom_origins;
+    #[runtime::pallet_index(78)]
+    pub type Scheduler = pallet_scheduler;
 }

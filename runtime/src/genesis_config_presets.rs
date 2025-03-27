@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{AccountId, BalancesConfig, RuntimeGenesisConfig, SudoConfig};
+use crate::{AccountId, BalancesConfig, RuntimeGenesisConfig, SudoConfig, UNIT};
 use alloc::{vec, vec::Vec};
 use serde_json::Value;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -34,7 +34,7 @@ fn testnet_genesis(
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|k| (k, 1u128 << 60))
+				.map(|k| (k, 100_000_000 * UNIT))
 				.collect::<Vec<_>>(),
 		},
 		aura: pallet_aura::GenesisConfig {
@@ -61,8 +61,9 @@ pub fn development_config_genesis() -> Value {
 		vec![
 			AccountKeyring::Alice.to_account_id(),
 			AccountKeyring::Bob.to_account_id(),
-			AccountKeyring::AliceStash.to_account_id(),
-			AccountKeyring::BobStash.to_account_id(),
+			AccountKeyring::Charlie.to_account_id(),
+			AccountKeyring::Dave.to_account_id(),
+			AccountKeyring::Eve.to_account_id(),
 		],
 		sp_keyring::AccountKeyring::Alice.to_account_id(),
 	)
@@ -81,10 +82,13 @@ pub fn local_config_genesis() -> Value {
 				sp_keyring::Ed25519Keyring::Bob.public().into(),
 			),
 		],
-		AccountKeyring::iter()
-			.filter(|v| v != &AccountKeyring::One && v != &AccountKeyring::Two)
-			.map(|v| v.to_account_id())
-			.collect::<Vec<_>>(),
+		vec![
+			AccountKeyring::Alice.to_account_id(),
+			AccountKeyring::Bob.to_account_id(),
+			AccountKeyring::Charlie.to_account_id(),
+			AccountKeyring::Dave.to_account_id(),
+			AccountKeyring::Eve.to_account_id(),
+		],
 		AccountKeyring::Alice.to_account_id(),
 	)
 }

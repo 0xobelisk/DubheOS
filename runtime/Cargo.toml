@@ -53,6 +53,16 @@ frame-system-benchmarking = { optional = true, workspace = true }
 dubhe-bridge.workspace = true
 dubhe-offchain-worker.workspace = true
 
+pallet-preimage.workspace = true
+pallet-referenda.workspace = true
+pallet-whitelist.workspace = true
+pallet-conviction-voting.workspace = true
+pallet-bounties.workspace = true
+pallet-treasury.workspace = true
+pallet-child-bounties.workspace = true
+sp-arithmetic.workspace = true
+pallet-scheduler.workspace = true
+
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
 
@@ -91,6 +101,15 @@ std = [
 	"sp-runtime/std",
 	"sp-session/std",
 	"sp-storage/std",
+	"pallet-preimage/std",
+	"pallet-referenda/std",
+	"pallet-whitelist/std",
+	"pallet-conviction-voting/std",
+	"pallet-bounties/std",
+	"pallet-treasury/std",
+	"pallet-child-bounties/std",
+	"pallet-scheduler/std",
+	"sp-arithmetic/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
 	"substrate-wasm-builder",

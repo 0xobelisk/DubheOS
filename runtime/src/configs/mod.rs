@@ -24,22 +24,23 @@
 // For more information, please refer to <http://unlicense.org>
 
 // Substrate and Polkadot dependencies
-use frame_support::{
-	derive_impl, parameter_types,
-	traits::{ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, VariantCountOf},
-	weights::{
-		constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
-		IdentityFee, Weight,
-	},
-};
+use frame_support::{derive_impl, parameter_types, traits::{ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, VariantCountOf}, weights::{
+	constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
+	IdentityFee, Weight,
+}, PalletId};
+use frame_support::traits::fungible::HoldConsideration;
+use frame_support::traits::{Currency, EitherOfDiverse, EqualPrivilegeOnly, Imbalance, LinearStoragePrice, OnUnbalanced};
+use frame_support::traits::tokens::{PayFromAccount, UnityAssetBalanceConversion};
+use frame_system::EnsureRoot;
 use frame_system::limits::{BlockLength, BlockWeights};
-use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
+use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_runtime::{traits::One, Perbill};
+use sp_runtime::{traits::One, Perbill, Percent, Permill};
+use sp_runtime::traits::{AccountIdConversion, IdentityLookup};
 use sp_version::RuntimeVersion;
-
+use crate::governance::{Treasurer, TreasurySpender};
 // Local module imports
-use super::{AccountId, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION};
+use super::{deposit, AccountId, Bounties, Treasury, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, UncheckedExtrinsic, CENT, DAYS, EXISTENTIAL_DEPOSIT, SLOT_DURATION, UNIT, VERSION, ChildBounties, OriginCaller, Preimage};
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -133,13 +134,30 @@ impl pallet_balances::Config for Runtime {
 	type DoneSlashHandler = ();
 }
 
+type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
+pub struct DealWithFees;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+	fn on_unbalanceds(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
+		if let Some(mut fees) = fees_then_tips.next() {
+			if let Some(tips) = fees_then_tips.next() {
+				tips.merge_into(&mut fees);
+			}
+			// for fees and tips, 100% to treasury
+			<Balances as Currency<AccountId>>::resolve_creating(
+				&TreasuryPalletId::get().into_account_truncating(),
+				fees,
+			);
+		}
+	}
+}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = FungibleAdapter<Balances, ()>;
+	type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = IdentityFee<Balance>;
 	type LengthToFee = IdentityFee<Balance>;
@@ -151,6 +169,123 @@ impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+	pub MaximumSchedulerWeight: Weight = NORMAL_DISPATCH_RATIO * RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_scheduler::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type PalletsOrigin = OriginCaller;
+	type RuntimeCall = RuntimeCall;
+	type MaximumWeight = MaximumSchedulerWeight;
+	type ScheduleOrigin = EnsureRoot<AccountId>;
+	type MaxScheduledPerBlock = ConstU32<50>;
+	type WeightInfo = ();
+	type OriginPrivilegeCmp = EqualPrivilegeOnly;
+	type Preimages = Preimage;
+}
+
+parameter_types! {
+	pub const PreimageBaseDeposit: Balance = deposit(2, 64);
+	pub const PreimageByteDeposit: Balance = deposit(0, 1);
+	pub const PreimageHoldReason: RuntimeHoldReason =
+		RuntimeHoldReason::Preimage(pallet_preimage::HoldReason::Preimage);
+}
+
+impl pallet_preimage::Config for Runtime {
+	type WeightInfo = ();
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type Consideration = HoldConsideration<
+		AccountId,
+		Balances,
+		PreimageHoldReason,
+		LinearStoragePrice<PreimageBaseDeposit, PreimageByteDeposit, Balance>,
+	>;
+}
+
+parameter_types! {
+	pub const MaxActiveChildBountyCount: u32 = 100;
+	pub const ChildBountyValueMinimum: Balance = BountyValueMinimum::get() / 10;
+}
+
+impl pallet_child_bounties::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type MaxActiveChildBountyCount = MaxActiveChildBountyCount;
+	type ChildBountyValueMinimum = ChildBountyValueMinimum;
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const BountyDepositBase: Balance = 100 * CENT;
+	pub const BountyDepositPayoutDelay: BlockNumber = 4 * DAYS;
+	pub const BountyUpdatePeriod: BlockNumber = 90 * DAYS;
+	pub const MaximumReasonLength: u32 = 16384;
+	pub const CuratorDepositMultiplier: Permill = Permill::from_percent(50);
+	pub const CuratorDepositMin: Balance = 10 * CENT;
+	pub const CuratorDepositMax: Balance = 500 * CENT;
+	pub const BountyValueMinimum: Balance = 200 * CENT;
+}
+
+impl pallet_bounties::Config for Runtime {
+	type BountyDepositBase = BountyDepositBase;
+	type BountyDepositPayoutDelay = BountyDepositPayoutDelay;
+	type BountyUpdatePeriod = BountyUpdatePeriod;
+	type CuratorDepositMultiplier = CuratorDepositMultiplier;
+	type CuratorDepositMin = CuratorDepositMin;
+	type CuratorDepositMax = CuratorDepositMax;
+	type BountyValueMinimum = BountyValueMinimum;
+	type ChildBountyManager = ChildBounties;
+	type DataDepositPerByte = DataDepositPerByte;
+	type RuntimeEvent = RuntimeEvent;
+	type MaximumReasonLength = MaximumReasonLength;
+	type WeightInfo = ();
+	type OnSlash = Treasury;
+}
+
+parameter_types! {
+	pub const ProposalBond: Permill = Permill::from_percent(5);
+	pub const ProposalBondMinimum: Balance = 100 * UNIT;
+	pub const ProposalBondMaximum: Balance = 500 * UNIT;
+	pub const SpendPeriod: BlockNumber = 24 * DAYS;
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub TreasuryAccount: AccountId = Treasury::account_id();
+	pub const PayoutSpendPeriod: BlockNumber = 30 * DAYS;
+	pub const TipCountdown: BlockNumber = DAYS;
+	pub const TipFindersFee: Percent = Percent::from_percent(20);
+	pub const TipReportDepositBase: Balance = UNIT;
+	pub const DataDepositPerByte: Balance = CENT;
+	pub const MaxApprovals: u32 = 100;
+	pub const MaxAuthorities: u32 = 100_000;
+	pub const MaxKeys: u32 = 10_000;
+	pub const MaxPeerInHeartbeats: u32 = 10_000;
+	pub const RootSpendOriginMaxAmount: Balance = Balance::MAX;
+	pub const CouncilSpendOriginMaxAmount: Balance = Balance::MAX;
+}
+
+impl pallet_treasury::Config for Runtime {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type RejectOrigin = EitherOfDiverse<EnsureRoot<AccountId>, Treasurer>;
+	type RuntimeEvent = RuntimeEvent;
+	type SpendPeriod = SpendPeriod;
+	type Burn = ();
+	type BurnDestination = ();
+	type SpendFunds = Bounties;
+	type MaxApprovals = MaxApprovals;
+	type WeightInfo = ();
+	type SpendOrigin = TreasurySpender;
+	type AssetKind = ();
+	type Beneficiary = AccountId;
+	type BeneficiaryLookup = IdentityLookup<AccountId>;
+	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
+	type BalanceConverter = UnityAssetBalanceConversion;
+	type PayoutPeriod = PayoutSpendPeriod;
+	type BlockNumberProvider = System;
 }
 
 /// Configure the dubhe-bridge in pallets/template.
