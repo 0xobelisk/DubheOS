@@ -251,7 +251,7 @@ parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 100 * UNIT;
 	pub const ProposalBondMaximum: Balance = 500 * UNIT;
-	pub const SpendPeriod: BlockNumber = 24 * DAYS;
+	pub const SpendPeriod: BlockNumber = 10;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub TreasuryAccount: AccountId = Treasury::account_id();
 	pub const PayoutSpendPeriod: BlockNumber = 30 * DAYS;

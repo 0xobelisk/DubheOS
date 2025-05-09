@@ -450,8 +450,8 @@ impl<T: Config> Pallet<T> {
     /// Test the Aptos API by sending a request with task data.
     fn fetch_aptos_data(da_height: u64, blob: BoundedVec<u8, T::StringLimit>) -> Result<(String, String), http::Error> {
         let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(8_000));
-        let url = "https://aptos-testnet-phad.obelisk.build/v1/Aptos/DaManager";
-
+        let url = "http://127.0.0.1:3001/v1/Aptos/DaManager";
+        // let url = "https://aptos-testnet-phad.obelisk.build/v1/Aptos/DaManager";
         let blob_str = sp_std::str::from_utf8(&blob).map_err(|e| {
             log::error!("Unable to convert blob to string: {:?}", e);
             http::Error::Unknown
