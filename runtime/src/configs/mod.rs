@@ -288,6 +288,13 @@ impl pallet_treasury::Config for Runtime {
 	type BlockNumberProvider = System;
 }
 
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type WeightInfo = ();
+	type PalletsOrigin = OriginCaller;
+}
+
 /// Configure the dubhe-bridge in pallets/template.
 impl dubhe_bridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;

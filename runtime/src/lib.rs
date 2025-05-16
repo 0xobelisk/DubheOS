@@ -261,4 +261,6 @@ mod runtime {
     pub type Origins = pallet_custom_origins;
     #[runtime::pallet_index(78)]
     pub type Scheduler = pallet_scheduler;
+    #[runtime::pallet_index(79)]
+    pub type Utility = pallet_utility;
 }

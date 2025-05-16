@@ -86,3 +86,4 @@ pallet-treasury = { version = "38.0.0", default-features = false }
 pallet-child-bounties = { version = "38.0.0", default-features = false }
 pallet-scheduler = { version = "40.0.0", default-features = false }
 sp-arithmetic = { version = "26.0.0", default-features = false }
+pallet-utility = { version = "39.0.0", default-features = false }

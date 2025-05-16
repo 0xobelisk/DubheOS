@@ -2274,6 +2274,7 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-treasury",
+ "pallet-utility",
  "pallet-whitelist",
  "parity-scale-codec",
  "scale-info",
@@ -6400,6 +6401,22 @@ dependencies = [
  "scale-info",
  "serde",
  "sp-core",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-utility"
+version = "39.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b30246db99703c4f62e1b8385ba807186e15f718c1d43ca03a48d1d487379645"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
 ]
 
