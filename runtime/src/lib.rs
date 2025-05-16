@@ -106,13 +106,12 @@ pub const CENT: Balance = UNIT / 100;
 pub const GRAND: Balance = 1000 * 10_000_000;
 pub const MILLI_UNIT: Balance = 10_000;
 pub const MICRO_UNIT: Balance = 10;
-pub const SUPPLY_FACTOR: Balance = 100;
-pub const TRANSACTION_BYTE_FEE: Balance = 1 * MILLI_UNIT * SUPPLY_FACTOR;
-pub const STORAGE_BYTE_FEE: Balance = 100 * MILLI_UNIT * SUPPLY_FACTOR;
-pub const WEIGHT_FEE: Balance = 50 * MICRO_UNIT * SUPPLY_FACTOR / 4;
+pub const TRANSACTION_BYTE_FEE: Balance = 1 * MILLI_UNIT;
+pub const STORAGE_BYTE_FEE: Balance = 100 * MILLI_UNIT;
+pub const WEIGHT_FEE: Balance = 50 * MICRO_UNIT / 4;
 
 pub const fn deposit(items: u32, bytes: u32) -> Balance {
-    items as Balance * 100 * MILLI_UNIT * SUPPLY_FACTOR + (bytes as Balance) * STORAGE_BYTE_FEE
+    items as Balance * 100 * MILLI_UNIT + (bytes as Balance) * STORAGE_BYTE_FEE
 }
 
 /// Existential deposit.

@@ -39,6 +39,14 @@ use sp_runtime::{traits::One, Perbill, Percent, Permill};
 use sp_runtime::traits::{AccountIdConversion, IdentityLookup};
 use sp_version::RuntimeVersion;
 use crate::governance::{Treasurer, TreasurySpender};
+use frame_support::weights::constants::ExtrinsicBaseWeight;
+use crate::MILLI_UNIT;
+use crate::TRANSACTION_BYTE_FEE;
+use frame_support::weights::WeightToFeeCoefficients;
+use frame_support::weights::WeightToFeePolynomial;
+use frame_support::weights::ConstantMultiplier;
+use frame_support::weights::WeightToFeeCoefficient;
+use smallvec::smallvec;
 // Local module imports
 use super::{deposit, AccountId, Bounties, Treasury, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, UncheckedExtrinsic, CENT, DAYS, EXISTENTIAL_DEPOSIT, SLOT_DURATION, UNIT, VERSION, ChildBounties, OriginCaller, Preimage};
 
@@ -151,16 +159,44 @@ impl OnUnbalanced<NegativeImbalance> for DealWithFees {
 	}
 }
 
+/// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
+/// node's balance type.
+///
+/// This should typically create a mapping between the following ranges:
+///   - `[0, MAXIMUM_BLOCK_WEIGHT]`
+///   - `[Balance::min, Balance::max]`
+///
+/// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
+///   - Setting it to `0` will essentially disable the weight fee.
+///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
+pub struct WeightToFee;
+impl WeightToFeePolynomial for WeightToFee {
+	type Balance = Balance;
+	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
+		// in Rococo, extrinsic base weight (smallest non-zero weight) is mapped to 1 MILLIUNIT:
+		// in our template, we map to 1/10 of that, or 1/10 MILLIUNIT
+		let p = MILLI_UNIT / 10;
+		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		smallvec![WeightToFeeCoefficient {
+			degree: 1,
+			negative: false,
+			coeff_frac: Perbill::from_rational(p % q, q),
+			coeff_integer: p / q,
+		}]
+	}
+}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
+	pub TransactionByteFee: Balance = TRANSACTION_BYTE_FEE;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = IdentityFee<Balance>;
-	type LengthToFee = IdentityFee<Balance>;
+	type WeightToFee = WeightToFee;
+	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 	type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
 }
